@@ -3,20 +3,27 @@ import random
 from questions import QUESTIONS
 
 
-# ---------------------------------------
-# 기본 설정
-# ---------------------------------------
+# ==========================================
+# 페이지 설정
+# ==========================================
 
 st.set_page_config(
-    page_title="밸런스 게임 🎮",
+    page_title="밸런스 게임 ⚖️",
     page_icon="⚖️",
     layout="centered"
 )
 
 
-# ---------------------------------------
+# ==========================================
+# 게임 설정
+# ==========================================
+
+MAX_QUESTIONS = 25
+
+
+# ==========================================
 # 세션 상태 초기화
-# ---------------------------------------
+# ==========================================
 
 if "current_question" not in st.session_state:
     st.session_state.current_question = None
@@ -36,13 +43,15 @@ if "history" not in st.session_state:
 if "category" not in st.session_state:
     st.session_state.category = "전체"
 
+if "game_finished" not in st.session_state:
+    st.session_state.game_finished = False
 
-# ---------------------------------------
+
+# ==========================================
 # 질문 가져오기
-# ---------------------------------------
+# ==========================================
 
 def get_questions():
-    """선택된 카테고리에 맞는 질문을 반환"""
 
     if st.session_state.category == "전체":
         return QUESTIONS
@@ -53,15 +62,17 @@ def get_questions():
     ]
 
 
+# ==========================================
+# 새로운 질문 가져오기
+# ==========================================
+
 def get_new_question():
-    """새로운 질문을 랜덤으로 가져오기"""
 
     available_questions = get_questions()
 
     if not available_questions:
         return None
 
-    # 이전 질문과 겹치지 않도록 시도
     previous_questions = [
         item["question"]
         for item in st.session_state.history
@@ -72,30 +83,49 @@ def get_new_question():
         if q["question"] not in previous_questions
     ]
 
-    # 모든 문제를 한 번씩 풀었다면 다시 전체에서 선택
     if not candidates:
         candidates = available_questions
 
     return random.choice(candidates)
 
 
-# ---------------------------------------
-# 선택 처리
-# ---------------------------------------
+# ==========================================
+# 게임 초기화
+# ==========================================
+
+def reset_game():
+
+    st.session_state.current_question = None
+    st.session_state.score_a = 0
+    st.session_state.score_b = 0
+    st.session_state.played = 0
+    st.session_state.history = []
+    st.session_state.game_finished = False
+
+    st.session_state.current_question = get_new_question()
+
+
+# ==========================================
+# 답변 선택
+# ==========================================
 
 def select_answer(answer):
+
     question = st.session_state.current_question
 
     if question is None:
         return
 
+    # 점수 기록
     if answer == "A":
         st.session_state.score_a += 1
     else:
         st.session_state.score_b += 1
 
+    # 문제 수 증가
     st.session_state.played += 1
 
+    # 기록 저장
     st.session_state.history.append({
         "category": question["category"],
         "question": question["question"],
@@ -104,20 +134,31 @@ def select_answer(answer):
         "answer": answer
     })
 
-    st.session_state.current_question = get_new_question()
+    # 25문제 완료
+    if st.session_state.played >= MAX_QUESTIONS:
+
+        st.session_state.game_finished = True
+        st.session_state.current_question = None
+
+    else:
+
+        st.session_state.current_question = get_new_question()
 
 
-# ---------------------------------------
+# ==========================================
 # 첫 질문 생성
-# ---------------------------------------
+# ==========================================
 
-if st.session_state.current_question is None:
+if (
+    st.session_state.current_question is None
+    and not st.session_state.game_finished
+):
     st.session_state.current_question = get_new_question()
 
 
-# ---------------------------------------
+# ==========================================
 # CSS
-# ---------------------------------------
+# ==========================================
 
 st.markdown(
     """
@@ -144,12 +185,14 @@ st.markdown(
             #764ba2 100%
         );
 
-        padding: 25px;
+        padding: 30px;
         border-radius: 20px;
         color: white;
         text-align: center;
         margin: 20px 0;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.12);
+
+        box-shadow:
+            0 10px 25px rgba(0,0,0,0.12);
     }
 
     .question-category {
@@ -163,20 +206,39 @@ st.markdown(
         font-weight: 700;
     }
 
-    .vs {
+    .progress-text {
         text-align: center;
-        font-size: 25px;
-        font-weight: 800;
-        color: #888;
-        margin-top: 20px;
+        font-size: 18px;
+        font-weight: 700;
+        margin: 15px 0;
     }
 
-    .score-box {
-        background-color: #f7f7f7;
-        border-radius: 15px;
-        padding: 15px;
+    .result-box {
+        background: linear-gradient(
+            135deg,
+            #667eea,
+            #764ba2
+        );
+
+        color: white;
+        padding: 35px;
+        border-radius: 25px;
         text-align: center;
-        margin-top: 20px;
+        margin-top: 30px;
+
+        box-shadow:
+            0 15px 35px rgba(0,0,0,0.18);
+    }
+
+    .result-title {
+        font-size: 32px;
+        font-weight: 800;
+        margin-bottom: 15px;
+    }
+
+    .result-score {
+        font-size: 22px;
+        line-height: 1.8;
     }
 
     </style>
@@ -185,9 +247,9 @@ st.markdown(
 )
 
 
-# ---------------------------------------
+# ==========================================
 # 제목
-# ---------------------------------------
+# ==========================================
 
 st.markdown(
     '<div class="main-title">⚖️ 밸런스 게임</div>',
@@ -195,93 +257,30 @@ st.markdown(
 )
 
 st.markdown(
-    '<div class="sub-title">둘 중 하나만 선택할 수 있다면?</div>',
+    '<div class="sub-title">25개의 질문에 답하고 나의 선택을 확인해보세요!</div>',
     unsafe_allow_html=True
 )
 
 
-# ---------------------------------------
-# 사이드바
-# ---------------------------------------
+# ==========================================
+# 게임 종료 화면
+# ==========================================
 
-with st.sidebar:
+if st.session_state.game_finished:
 
-    st.header("🎯 게임 설정")
-
-    categories = [
-        "전체",
-        "🎮 게임",
-        "🍔 음식",
-        "✈️ 여행지",
-        "🎤 아이돌",
-        "🎵 노래",
-        "🎬 영화/드라마",
-        "💰 돈/라이프",
-        "💖 연애"
-    ]
-
-    selected_category = st.selectbox(
-        "카테고리",
-        categories,
-        index=categories.index(
-            st.session_state.category
-        )
-    )
-
-    if selected_category != st.session_state.category:
-        st.session_state.category = selected_category
-        st.session_state.current_question = get_new_question()
-
-    st.divider()
-
-    st.subheader("📊 현재 기록")
-
-    st.write(
-        f"🎮 플레이: **{st.session_state.played}문제**"
-    )
-
-    st.write(
-        f"🅰️ A 선택: **{st.session_state.score_a}회**"
-    )
-
-    st.write(
-        f"🅱️ B 선택: **{st.session_state.score_b}회**"
-    )
-
-    st.divider()
-
-    if st.button(
-        "🔄 게임 초기화",
-        use_container_width=True
-    ):
-        st.session_state.current_question = get_new_question()
-        st.session_state.score_a = 0
-        st.session_state.score_b = 0
-        st.session_state.played = 0
-        st.session_state.history = []
-
-        st.rerun()
-
-
-# ---------------------------------------
-# 현재 질문
-# ---------------------------------------
-
-question = st.session_state.current_question
-
-
-if question:
+    st.balloons()
 
     st.markdown(
-        f"""
-        <div class="question-box">
+        """
+        <div class="result-box">
 
-            <div class="question-category">
-                {question["category"]}
+            <div class="result-title">
+                🎉 게임 종료!
             </div>
 
-            <div class="question-text">
-                {question["question"]}
+            <div class="result-score">
+                25개의 질문을 모두 완료했습니다!<br>
+                당신의 밸런스 게임 결과를 확인해보세요.
             </div>
 
         </div>
@@ -289,108 +288,281 @@ if question:
         unsafe_allow_html=True
     )
 
+    st.write("")
 
-    # -----------------------------------
-    # 선택지
-    # -----------------------------------
+    # --------------------------------------
+    # 결과 계산
+    # --------------------------------------
+
+    a_score = st.session_state.score_a
+    b_score = st.session_state.score_b
+
+    a_percent = round(
+        (a_score / MAX_QUESTIONS) * 100
+    )
+
+    b_percent = round(
+        (b_score / MAX_QUESTIONS) * 100
+    )
+
+    st.subheader("📊 나의 선택 결과")
 
     col1, col2 = st.columns(2)
 
     with col1:
 
-        st.markdown("### 🅰️ A")
-
-        if st.button(
-            question["A"],
-            key="answer_a",
-            use_container_width=True
-        ):
-            select_answer("A")
-            st.rerun()
-
+        st.metric(
+            "🅰️ A 선택",
+            f"{a_score}회",
+            f"{a_percent}%"
+        )
 
     with col2:
 
-        st.markdown("### 🅱️ B")
+        st.metric(
+            "🅱️ B 선택",
+            f"{b_score}회",
+            f"{b_percent}%"
+        )
+
+    st.divider()
+
+    # --------------------------------------
+    # 성향 결과
+    # --------------------------------------
+
+    st.subheader("🔮 당신의 선택 성향")
+
+    if a_score >= 20:
+
+        st.success(
+            "🅰️ **A 선택 성향이 매우 강합니다!**\n\n"
+            "당신은 확실한 선택을 좋아하는 스타일이에요."
+        )
+
+    elif a_score >= 15:
+
+        st.info(
+            "🅰️ **A 선택 성향이 강한 편입니다!**\n\n"
+            "전체적으로 A를 선호하는 모습을 보여줬어요."
+        )
+
+    elif b_score >= 20:
+
+        st.success(
+            "🅱️ **B 선택 성향이 매우 강합니다!**\n\n"
+            "당신은 자신만의 확실한 취향이 있는 스타일이에요."
+        )
+
+    elif b_score >= 15:
+
+        st.info(
+            "🅱️ **B 선택 성향이 강한 편입니다!**\n\n"
+            "전체적으로 B를 선호하는 모습을 보여줬어요."
+        )
+
+    else:
+
+        st.warning(
+            "⚖️ **완벽한 밸런스형!**\n\n"
+            "A와 B를 비슷하게 선택했어요. "
+            "상황에 따라 유연하게 선택하는 스타일입니다!"
+        )
+
+    st.divider()
+
+    # --------------------------------------
+    # 내가 선택한 기록
+    # --------------------------------------
+
+    st.subheader("📜 내가 선택한 25개")
+
+    for i, item in enumerate(
+        st.session_state.history,
+        start=1
+    ):
+
+        if item["answer"] == "A":
+            selected = f"🅰️ {item['A']}"
+        else:
+            selected = f"🅱️ {item['B']}"
+
+        st.write(
+            f"**{i}. {item['question']}**"
+        )
+
+        st.caption(
+            f"{item['category']}  |  선택: {selected}"
+        )
+
+    st.divider()
+
+    # --------------------------------------
+    # 다시하기
+    # --------------------------------------
+
+    if st.button(
+        "🔄 다시 게임하기",
+        use_container_width=True
+    ):
+
+        reset_game()
+
+        st.rerun()
+
+
+# ==========================================
+# 게임 진행 화면
+# ==========================================
+
+else:
+
+    # --------------------------------------
+    # 사이드바
+    # --------------------------------------
+
+    with st.sidebar:
+
+        st.header("🎯 게임 설정")
+
+        categories = [
+            "전체",
+            "🎮 게임",
+            "🍔 음식",
+            "✈️ 여행지",
+            "🎤 아이돌",
+            "🎵 노래",
+            "🎬 영화/드라마",
+            "💰 돈/라이프",
+            "💖 연애"
+        ]
+
+        selected_category = st.selectbox(
+            "카테고리",
+            categories,
+            index=categories.index(
+                st.session_state.category
+            )
+        )
+
+        if (
+            selected_category
+            != st.session_state.category
+        ):
+
+            st.session_state.category = selected_category
+
+            st.session_state.current_question = (
+                get_new_question()
+            )
+
+        st.divider()
+
+        st.subheader("📊 게임 진행")
+
+        st.write(
+            f"문제: **{st.session_state.played + 1} / {MAX_QUESTIONS}**"
+        )
+
+        st.write(
+            f"🅰️ A 선택: **{st.session_state.score_a}회**"
+        )
+
+        st.write(
+            f"🅱️ B 선택: **{st.session_state.score_b}회**"
+        )
+
+        st.progress(
+            st.session_state.played
+            / MAX_QUESTIONS
+        )
+
+        st.divider()
 
         if st.button(
-            question["B"],
-            key="answer_b",
+            "🔄 게임 초기화",
             use_container_width=True
         ):
-            select_answer("B")
+
+            reset_game()
+
             st.rerun()
 
 
-    st.markdown(
-        '<div class="vs">VS</div>',
-        unsafe_allow_html=True
-    )
+    # --------------------------------------
+    # 문제
+    # --------------------------------------
 
+    question = st.session_state.current_question
 
-# ---------------------------------------
-# 점수 표시
-# ---------------------------------------
+    if question:
 
-st.markdown(
-    f"""
-    <div class="score-box">
+        # 진행 상황
+        st.markdown(
+            f"""
+            <div class="progress-text">
+                🔥 {st.session_state.played + 1} / {MAX_QUESTIONS}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-    <b>📊 나의 선택 기록</b>
+        # 질문
+        st.markdown(
+            f"""
+            <div class="question-box">
 
-    <br><br>
+                <div class="question-category">
+                    {question["category"]}
+                </div>
 
-    🅰️ A 선택
-    <b>{st.session_state.score_a}</b>
-    회
+                <div class="question-text">
+                    {question["question"]}
+                </div>
 
-    &nbsp;&nbsp;&nbsp;
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-    🅱️ B 선택
-    <b>{st.session_state.score_b}</b>
-    회
+        st.write("")
 
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+        # ----------------------------------
+        # 선택 버튼
+        # ----------------------------------
 
+        col1, col2 = st.columns(2)
 
-# ---------------------------------------
-# 선택 기록
-# ---------------------------------------
+        with col1:
 
-if st.session_state.history:
+            st.markdown("### 🅰️ A")
 
-    with st.expander("📜 내가 지금까지 선택한 기록 보기"):
+            if st.button(
+                question["A"],
+                key="answer_a",
+                use_container_width=True
+            ):
 
-        for i, item in enumerate(
-            reversed(st.session_state.history),
-            start=1
-        ):
+                select_answer("A")
 
-            answer_text = (
-                item["A"]
-                if item["answer"] == "A"
-                else item["B"]
-            )
+                st.rerun()
 
-            st.write(
-                f"**{i}. [{item['category']}]** "
-                f"{item['question']}"
-            )
+        with col2:
 
-            st.write(
-                f"👉 선택: **{answer_text}**"
-            )
+            st.markdown("### 🅱️ B")
 
-            st.divider()
+            if st.button(
+                question["B"],
+                key="answer_b",
+                use_container_width=True
+            ):
 
+                select_answer("B")
 
-# ---------------------------------------
-# 하단 안내
-# ---------------------------------------
+                st.rerun()
 
-st.caption(
-    "💡 정답은 없습니다. 당신의 취향을 선택해보세요!"
-)
+        st.write("")
+
+        st.caption(
+            "💡 정답은 없습니다! 마음에 드는 것을 선택하세요."
+        )
